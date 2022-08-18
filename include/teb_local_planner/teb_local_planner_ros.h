@@ -223,7 +223,7 @@ public:
   
   //@}
   
-protected:
+private:
 
   /**
     * @brief Update internal obstacle vector based on occupied costmap cells
@@ -446,8 +446,16 @@ private:
   // flags
   bool initialized_; //!< Keeps track about the correct initialization of this class
 
+
+
+
+
+
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  // geometry_msgs::TransformStamped plan_to_global_transform;
+  // geometry_msgs::TransformStamped plan_to_global_transform_old;
+  // bool first_flag = true;
 };
   
 }; // end namespace teb_local_planner

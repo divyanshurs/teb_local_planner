@@ -196,6 +196,8 @@ bool TebOptimalPlanner::optimizeTEB(int iterations_innerloop, int iterations_out
   
   double weight_multiplier = 1.0;
 
+  // ROS_INFO("OHH NO");
+
   // TODO(roesmann): we introduced the non-fast mode with the support of dynamic obstacles
   //                (which leads to better results in terms of x-y-t homotopy planning).
   //                 however, we have not tested this mode intensively yet, so we keep
@@ -253,6 +255,7 @@ void TebOptimalPlanner::setVelocityGoal(const geometry_msgs::Twist& vel_goal)
 bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& initial_plan, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
 {    
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
+  // ROS_INFO("DISABLED Opti");
   if (!teb_.isInit())
   {
     teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, cfg_->robot.max_vel_theta, cfg_->trajectory.global_plan_overwrite_orientation,
@@ -268,7 +271,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
       teb_.updateAndPruneTEB(start_, goal_, cfg_->trajectory.min_samples); // update TEB
     else // goal too far away -> reinit
     {
-      ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitalizing trajectories.");
+      ROS_INFO("New goal: distance to existing goal is higher than the specified threshold. Reinitalizing trajectories.");
       teb_.clearTimedElasticBand();
       teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, cfg_->robot.max_vel_theta, cfg_->trajectory.global_plan_overwrite_orientation,
         cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
@@ -282,6 +285,7 @@ bool TebOptimalPlanner::plan(const std::vector<geometry_msgs::PoseStamped>& init
     vel_goal_.first = true; // we just reactivate and use the previously set velocity (should be zero if nothing was modified)
   
   // now optimize
+  // return true;
   return optimizeTEB(cfg_->optim.no_inner_iterations, cfg_->optim.no_outer_iterations);
 }
 
@@ -339,14 +343,14 @@ bool TebOptimalPlanner::buildGraph(double weight_multiplier)
   // add TEB vertices
   AddTEBVertices();
   
-  // add Edges (local cost functions)
-  if (cfg_->obstacles.legacy_obstacle_association)
-    AddEdgesObstaclesLegacy(weight_multiplier);
-  else
-    AddEdgesObstacles(weight_multiplier);
+  // // add Edges (local cost functions)
+  // if (cfg_->obstacles.legacy_obstacle_association)
+  //   AddEdgesObstaclesLegacy(weight_multiplier);
+  // else
+  //   AddEdgesObstacles(weight_multiplier);
 
-  if (cfg_->obstacles.include_dynamic_obstacles)
-    AddEdgesDynamicObstacles();
+  // if (cfg_->obstacles.include_dynamic_obstacles)
+  //   AddEdgesDynamicObstacles();
   
   AddEdgesViaPoints();
   
@@ -358,15 +362,15 @@ bool TebOptimalPlanner::buildGraph(double weight_multiplier)
 
   AddEdgesShortestPath();
   
-  if (cfg_->robot.min_turning_radius == 0 || cfg_->optim.weight_kinematics_turning_radius == 0)
-    AddEdgesKinematicsDiffDrive(); // we have a differential drive robot
-  else
-    AddEdgesKinematicsCarlike(); // we have a carlike robot since the turning radius is bounded from below.
+  // if (cfg_->robot.min_turning_radius == 0 || cfg_->optim.weight_kinematics_turning_radius == 0)
+  //   AddEdgesKinematicsDiffDrive(); // we have a differential drive robot
+  // else
+  //   AddEdgesKinematicsCarlike(); // we have a carlike robot since the turning radius is bounded from below.
 
   AddEdgesPreferRotDir();
 
-  if (cfg_->optim.weight_velocity_obstacle_ratio > 0)
-    AddEdgesVelocityObstacleRatio();
+  // if (cfg_->optim.weight_velocity_obstacle_ratio > 0)
+  //   AddEdgesVelocityObstacleRatio();
     
   return true;  
 }
@@ -1125,6 +1129,7 @@ void TebOptimalPlanner::extractVelocity(const PoseSE2& pose1, const PoseSE2& pos
     // transform pose 2 into the current robot frame (pose1)
     // for velocities only the rotation of the direction vector is necessary.
     // (map->pose1-frame: inverse 2d rotation matrix)
+    // ROS_INFO("I am holo");
     double cos_theta1 = std::cos(pose1.theta());
     double sin_theta1 = std::sin(pose1.theta());
     double p1_dx =  cos_theta1*deltaS.x() + sin_theta1*deltaS.y();
@@ -1149,6 +1154,7 @@ bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega
     return false;
   }
   look_ahead_poses = std::max(1, std::min(look_ahead_poses, teb_.sizePoses() - 1 - cfg_->trajectory.prevent_look_ahead_poses_near_goal));
+  // ROS_INFO("look_ahead_poses1, %d", look_ahead_poses);
   double dt = 0.0;
   for(int counter = 0; counter < look_ahead_poses; ++counter)
   {
@@ -1167,6 +1173,7 @@ bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega
     omega = 0;
     return false;
   }
+  // ROS_INFO("look_ahead_poses2, %d", look_ahead_poses);
 	  
   // Get velocity from the first two configurations
   extractVelocity(teb_.Pose(0), teb_.Pose(look_ahead_poses), dt, vx, vy, omega);

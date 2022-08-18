@@ -1,0 +1,3 @@
+GlobalPlanner:
+  orientation_mode: 1
+  distance_threshold: 1.5

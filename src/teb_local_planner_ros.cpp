@@ -109,16 +109,19 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
     RobotFootprintModelPtr robot_model = getRobotFootprintFromParamServer(nh, cfg_);
     
     // create the planner instance
-    if (cfg_.hcp.enable_homotopy_class_planning)
-    {
-      planner_ = PlannerInterfacePtr(new HomotopyClassPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_));
-      ROS_INFO("Parallel planning in distinctive topologies enabled.");
-    }
-    else
-    {
-      planner_ = PlannerInterfacePtr(new TebOptimalPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_));
-      ROS_INFO("Parallel planning in distinctive topologies disabled.");
-    }
+    // if (cfg_.hcp.enable_homotopy_class_planning)
+    // {
+    //   planner_ = PlannerInterfacePtr(new HomotopyClassPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_));
+    //   ROS_INFO("Parallel planning in distinctive topologies enabled.");
+    // }
+    // else
+    // {
+    //   planner_ = PlannerInterfacePtr(new TebOptimalPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_));
+    //   ROS_INFO("Parallel planning in distinctive topologies disabled.");
+    // }
+
+    planner_ = PlannerInterfacePtr(new TebOptimalPlanner(cfg_, &obstacles_, robot_model, visualization_, &via_points_));
+
     
     // init other variables
     tf_ = tf;
@@ -272,7 +275,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   if (!transformGlobalPlan(*tf_, global_plan_, robot_pose, *costmap_, global_frame_, cfg_.trajectory.max_global_plan_lookahead_dist, 
                            transformed_plan, &goal_idx, &tf_plan_to_global))
   {
-    ROS_WARN("Could not transform the global plan to the frame of the controller");
+    ROS_WARN("TEB PLANNER: Could not transform the global plan to the frame of the controller");
     message = "Could not transform the global plan to the frame of the controller";
     return mbf_msgs::ExePathResult::INTERNAL_ERROR;
   }
@@ -694,7 +697,7 @@ bool TebLocalPlannerROS::pruneGlobalPlan(const tf2_ros::Buffer& tf, const geomet
   return true;
 }
       
-
+using namespace std;
 bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const std::vector<geometry_msgs::PoseStamped>& global_plan,
                   const geometry_msgs::PoseStamped& global_pose, const costmap_2d::Costmap2D& costmap, const std::string& global_frame, double max_plan_length,
                   std::vector<geometry_msgs::PoseStamped>& transformed_plan, int* current_goal_idx, geometry_msgs::TransformStamped* tf_plan_to_global) const
@@ -704,6 +707,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
   const geometry_msgs::PoseStamped& plan_pose = global_plan[0];
 
   transformed_plan.clear();
+  geometry_msgs::TransformStamped plan_to_global_transform;
 
   try 
   {
@@ -714,13 +718,11 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
       return false;
     }
 
-    // get plan_to_global_transform from plan frame to global_frame
-    geometry_msgs::TransformStamped plan_to_global_transform = tf.lookupTransform(global_frame, ros::Time(), plan_pose.header.frame_id, plan_pose.header.stamp,
-                                                                                  plan_pose.header.frame_id, ros::Duration(cfg_.robot.transform_tolerance));
+    plan_to_global_transform = tf.lookupTransform(global_frame,plan_pose.header.frame_id, ros::Time(), ros::Duration(0.5));
 
-    //let's get the pose of the robot in the frame of the plan
     geometry_msgs::PoseStamped robot_pose;
-    tf.transform(global_pose, robot_pose, plan_pose.header.frame_id);
+    tf.transform(global_pose, robot_pose, plan_pose.header.frame_id, ros::Duration(0.5));
+
 
     //we'll discard points on the plan that are outside the local costmap
     double dist_threshold = std::max(costmap.getSizeInCellsX() * costmap.getResolution() / 2.0,
@@ -762,6 +764,7 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
     {
       const geometry_msgs::PoseStamped& pose = global_plan[i];
       tf2::doTransform(pose, newer_pose, plan_to_global_transform);
+
 
       transformed_plan.push_back(newer_pose);
 
@@ -808,12 +811,11 @@ bool TebLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
   }
   catch(tf::ExtrapolationException& ex) 
   {
-    ROS_ERROR("Extrapolation Error: %s\n", ex.what());
-    if (global_plan.size() > 0)
-      ROS_ERROR("Global Frame: %s Plan Frame size %d: %s\n", global_frame.c_str(), (unsigned int)global_plan.size(), global_plan[0].header.frame_id.c_str());
-
-    return false;
-  }
+      ROS_ERROR("Extrapolation Error: %s\n", ex.what());
+      if (global_plan.size() > 0)
+        ROS_ERROR("Global Frame: %s Plan Frame size %d: %s\n", global_frame.c_str(), (unsigned int)global_plan.size(), global_plan[0].header.frame_id.c_str());
+      return false;
+  }   
 
   return true;
 }
